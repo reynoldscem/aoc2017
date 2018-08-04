@@ -20,6 +20,13 @@ class Layer():
         self.depth = depth
         self.range = range_
 
+        if self.range >= 1:
+            self.scanner_position = 0
+        else:
+            self.scanner_position = None
+
+        self.packet_position = None
+
     def __str__(self):
         line_0 = ' ' + '[' * self.range
         line_1 = '{}'.format(self.depth) + ' ' * self.range
@@ -29,6 +36,12 @@ class Layer():
             line_0 += '.'
             line_1 += '.'
             line_2 += '.'
+        else:
+            line_1_list = list(line_1)
+            line_1_list[self.scanner_position + 1] = 'S'
+
+            # Doesn't matter that it's a list now.
+            line_1 = line_1_list
 
         lines = [list(line_0), list(line_1), list(line_2)]
         lines = [
@@ -42,6 +55,10 @@ class Layer():
 
     def __lt__(self, other):
         return self.depth < other.depth
+
+    def tick(self):
+        if self.range >= 1:
+            self.scanner_position = (self.scanner_position + 1) % self.range
 
     @staticmethod
     def merge_layer_strings(layer_1, layer_2, fill_char=' '):
@@ -77,17 +94,26 @@ class Firewall():
         unused_indices = set(range(0, max(depths))) - set(depths)
         for unused_index in unused_indices:
             self.layers.append(Layer(unused_index))
+        self.layers = sorted(self.layers)
+
+    def tick(self):
+        for layer in self.layers:
+            layer.tick()
 
     def __str__(self):
         from functools import reduce
-        return reduce(Layer.merge_layer_strings, sorted(self.layers))
+        return reduce(Layer.merge_layer_strings, self.layers)
 
 def main():
     args = build_parser().parse_args()
     with open(args.filename) as fd:
         data = fd.read().splitlines()
     layers = [Layer(*parse_line(line)) for line in data]
+
     firewall = Firewall(layers)
+    for _ in range(10):
+        print(firewall)
+        firewall.tick()
 
     print(firewall)
 
