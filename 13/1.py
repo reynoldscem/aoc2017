@@ -25,11 +25,15 @@ class Layer():
         else:
             self.scanner_position = None
 
-        self.packet_position = None
+        self.has_packet = False
+        self.severity = 0
+        self.direction = 1
 
     def __str__(self):
         line_0 = ' ' + '[' * self.range
-        line_1 = '{}'.format(self.depth) + ' ' * self.range
+
+        # Print depth modulo 10 to keep width at 1 char.
+        line_1 = '{}'.format(self.depth % 10) + ' ' * self.range
         line_2 = ' ' + ']' * self.range
 
         if self.range == 0:
@@ -42,6 +46,15 @@ class Layer():
 
             # Doesn't matter that it's a list now.
             line_1 = line_1_list
+
+        if self.has_packet:
+            line_0_list = list(line_0)
+            line_0_list[1] = '('
+            line_0 = line_0_list
+
+            line_2_list = list(line_2)
+            line_2_list[1] = ')'
+            line_2 = line_2_list
 
         lines = [list(line_0), list(line_1), list(line_2)]
         lines = [
@@ -58,7 +71,18 @@ class Layer():
 
     def tick(self):
         if self.range >= 1:
-            self.scanner_position = (self.scanner_position + 1) % self.range
+            self.scanner_position = (self.scanner_position + self.direction)
+            if self.scanner_position == self.range - 1 or self.scanner_position == 0:
+                self.direction *= -1
+
+    def packet_enter(self):
+        self.has_packet = True
+        if self.scanner_position == 0:
+            self.severity = self.depth * self.range
+
+            return self.severity
+        else:
+            return 0
 
     @staticmethod
     def merge_layer_strings(layer_1, layer_2, fill_char=' '):
@@ -96,7 +120,17 @@ class Firewall():
             self.layers.append(Layer(unused_index))
         self.layers = sorted(self.layers)
 
+        self.packet_position = -1
+        self.severity = 0
+
     def tick(self):
+        self.layers[self.packet_position].has_packet = False
+        self.packet_position += 1
+        try:
+            self.severity += self.layers[self.packet_position].packet_enter()
+        except:
+            raise IndexError('Packet has left')
+
         for layer in self.layers:
             layer.tick()
 
@@ -111,10 +145,21 @@ def main():
     layers = [Layer(*parse_line(line)) for line in data]
 
     firewall = Firewall(layers)
-    for _ in range(10):
+    print('Initial state')
+    print(firewall)
+    from itertools import count
+    for picosecond in count():
+        try:
+            firewall.tick()
+        except IndexError:
+            print()
+            print('Trip cost: {}'.format(firewall.severity))
+            print()
+            break
+        print('Picosecond {}'.format(picosecond))
         print(firewall)
-        firewall.tick()
 
+    print('Final state')
     print(firewall)
 
 
